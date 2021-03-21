@@ -489,8 +489,8 @@ TEST_P(MFPipeTest, MultiThreading)
 
   std::vector<TestMessage> received;
 
-  int MAX_ITER = 128;
-  int thread_count = 8;
+  int MAX_ITER = 32;
+  int thread_count = 4;
   for (int i = 0; i < thread_count; i++) {
     workers.push_back(std::make_unique<std::thread>([&]() {
       for (int j = 0; j < MAX_ITER; j++) {
