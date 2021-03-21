@@ -387,10 +387,6 @@ MFPipeImpl::PipeOpen(/*[in]*/ const std::string& strPipeID, /*[in]*/ int _nMaxBu
 
 HRESULT MFPipeImpl::WriteToPipe(const void* data, size_t size, int _nMaxWaitMs)
 {
-  while (!m_is_connected) {
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(10ms);
-  }
   std::unique_lock<std::timed_mutex> lock(write_mutex, std::defer_lock);
   if (_nMaxWaitMs > 0) {
     auto timeout = std::chrono::steady_clock::now() + std::chrono::milliseconds(_nMaxWaitMs);
