@@ -127,7 +127,11 @@ UDPPipeClient::~UDPPipeClient()
 size_t
 UDPPipeClient::write(const void* data, uint32_t len)
 {
+#ifdef WIN32
+  constexpr static int MAX_PACKAGE_SIZE = 534;
+#else
   constexpr static int MAX_PACKAGE_SIZE = 65535 - 28;
+#endif
   int pos = 0;
   while (pos < len) {
     int block_size = std::min<int>(MAX_PACKAGE_SIZE, len - pos);
@@ -146,9 +150,18 @@ UDPPipeClient::write(const void* data, uint32_t len)
 size_t
 UDPPipeClient::read(void* buffer, uint32_t buffer_len)
 {
+#ifdef WIN32
+  fd_set fds{};
+  struct timeval tv{};
+  FD_SET(m_socket, &fds);
+  // Set up the struct timeval for the timeout.
+  tv.tv_usec = MAX_WAIT_READ_TIMEOUT_MS ;
+  auto r = select ( m_socket, &fds, NULL, NULL, &tv );
+  if(r==0)
+    return 0;
+
   socklen_t len = sizeof(m_dst_address);
 
-#ifdef WIN32
   auto n = recvfrom(m_socket, (char*)buffer, buffer_len, 0, (struct sockaddr*)&m_dst_address, &len);
 #else
   auto n = recvfrom(m_socket, buffer, buffer_len, MSG_DONTWAIT, (struct sockaddr*)&m_dst_address, &len);
