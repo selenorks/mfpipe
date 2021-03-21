@@ -17,7 +17,7 @@ TEST_P(MFPipeInvalidTest, CreateInvalid)
   ASSERT_EQ(MFPipe_Write.PipeCreate(url, ""), E_INVALIDARG);
 }
 
-INSTANTIATE_TEST_SUITE_P(CreateInvalid, MFPipeInvalidTest, ::testing::Combine(::testing::Values("", "", "tcp://127.0.0.1:12345")));
+INSTANTIATE_TEST_SUITE_P(CreateInvalid, MFPipeInvalidTest, ::testing::Combine(::testing::Values("",  "tcp://127.0.0.1:12345")));
 
 class MFPipeTest : public testing::TestWithParam<::std::tuple<std::string>>
 {
@@ -30,8 +30,8 @@ constexpr static int PIPE_WAIT_TIMEOUT = 500;
 
 INSTANTIATE_TEST_SUITE_P(CreateUDP,
                          MFPipeTest,
-                         ::testing::Combine(::testing::Values("udp://127.0.0.1:12345",
-                                                              "Udp://127.0.0.1:12345")));
+                         ::testing::Combine(::testing::Values("udp://127.0.0.1:12345"
+                                                              )));
 
 TEST_P(MFPipeTest, SingleChannel)
 {
