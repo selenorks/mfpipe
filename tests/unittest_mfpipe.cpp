@@ -1,6 +1,9 @@
 #include <iostream>
 
-#include <MFPipeImpl.cpp>
+#include "common_pipe_test.h"
+#include <MFPipeImpl.h>
+
+#include <gtest/gtest.h>
 
 #define PACKETS_COUNT (8)
 
@@ -8,17 +11,14 @@
 #define SIZEOF_ARRAY(arr) (sizeof(arr) / sizeof((arr)[0]))
 #endif // SIZEOF_ARRAY
 
-int
-TestMethod1()
+TEST(Main, TestMethod1)
 {
+  srand(0);
   std::shared_ptr<MF_BUFFER> arrBuffersIn[PACKETS_COUNT];
   for (int i = 0; i < SIZEOF_ARRAY(arrBuffersIn); ++i) {
     size_t cbSize = 128 * 1024 + rand() % (256 * 1024);
-    arrBuffersIn[i] = std::make_shared<MF_BUFFER>();
-
-    arrBuffersIn[i]->flags = eMFBF_Buffer;
-    // Fill buffer
-    // TODO: fill by test data here
+    cbSize = 128 * 1024 + rand() % (256 * 1024);
+    arrBuffersIn[i] = GenerateMfBuffer(cbSize);
   }
 
   std::string pstrEvents[] = { "event1", "event2", "event3", "event4", "event5", "event6", "event7", "event8" };
@@ -27,13 +27,14 @@ TestMethod1()
   //////////////////////////////////////////////////////////////////////////
   // Pipe creation
 
+  std::string pipeName = "udp://127.0.0.1:12345";
   // Write pipe
   MFPipeImpl MFPipe_Write;
-  MFPipe_Write.PipeCreate("udp://127.0.0.1:12345", "");
+  MFPipe_Write.PipeCreate(pipeName, "");
 
   // Read pipe
   MFPipeImpl MFPipe_Read;
-  MFPipe_Read.PipeOpen("udp://127.0.0.1:12345", 32, "");
+  MFPipe_Read.PipeOpen(pipeName, 32, "");
 
   //////////////////////////////////////////////////////////////////////////
   // Test code (single-threaded)
@@ -41,69 +42,76 @@ TestMethod1()
 
   // Note: channels ( "ch1", "ch2" is optional)
 
+  struct ChannelTestStat
+  {
+    int in = 0;
+    int out = 0;
+  };
+  const int channel_count = 2;
+  const std::string test_channels[channel_count] = { "ch1", "ch2" };
+
+  ChannelTestStat ch_object[channel_count];
+  ChannelTestStat ch_message[channel_count];
+
   for (int i = 0; i < 128; ++i) {
-    // Write to pipe
-    MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 0, "");
-    MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 0, "");
+    for (int j = 0; j < channel_count; j++)
+      ASSERT_EQ(MFPipe_Write.PipePut(test_channels[j], arrBuffersIn[ch_object[j].in++ % PACKETS_COUNT], 0, ""), S_OK);
 
-    MFPipe_Write.PipeMessagePut("ch1", pstrEvents[i % PACKETS_COUNT], pstrMessages[i % PACKETS_COUNT], 100); ///
-    MFPipe_Write.PipeMessagePut("ch2", pstrEvents[(i + 1) % PACKETS_COUNT], pstrMessages[(i + 1) % PACKETS_COUNT], 100);
+    for (int j = 0; j < channel_count; j++) {
+      ASSERT_EQ(MFPipe_Write.PipeMessagePut(test_channels[j], pstrEvents[ch_message[j].in % PACKETS_COUNT], pstrMessages[ch_message[j].in % PACKETS_COUNT], 100), S_OK);
+      ch_message[j].in++;
+    }
 
-    MFPipe_Write.PipePut("ch1", arrBuffersIn[i % PACKETS_COUNT], 0, "");
-    MFPipe_Write.PipePut("ch2", arrBuffersIn[(i + 1) % PACKETS_COUNT], 0, "");
-    //
-    //		std::string strPipeName;
-    //		MFPipe_Write.PipeInfoGet(&strPipeName, "", NULL);
-    //
-    //		MFPipe::MF_PIPE_INFO mfInfo = {};
-    //		MFPipe_Write.PipeInfoGet(NULL, "ch2", &mfInfo);
-    //		MFPipe_Write.PipeInfoGet(NULL, "ch1", &mfInfo);
+    for (int j = 0; j < channel_count; j++)
+      ASSERT_EQ(MFPipe_Write.PipePut(test_channels[j], arrBuffersIn[ch_object[j].in++ % PACKETS_COUNT], 0, ""), S_OK);
+
+
+    // Check info
+    std::string strPipeName;
+    ASSERT_EQ(MFPipe_Write.PipeInfoGet(&strPipeName, "", NULL), S_OK);
+    ASSERT_EQ(pipeName, strPipeName);
+
+//    MFPipe::MF_PIPE_INFO mfInfo = {};
+//    MFPipe_Write.PipeInfoGet(NULL, "ch2", &mfInfo);
+//    MFPipe_Write.PipeInfoGet(NULL, "ch1", &mfInfo);
 
     // Read from pipe
-    std::string arrStrings[4];
+    std::string arrStrings[2];
 
-    MFPipe_Read.PipeMessageGet("ch1", &arrStrings[0], &arrStrings[1], 100); //
-    MFPipe_Read.PipeMessageGet("ch2", &arrStrings[2], &arrStrings[3], 100);
+    // check messages
+    for (int j = 0; j < channel_count; j++) {
+      while (S_OK == MFPipe_Read.PipeMessageGet(test_channels[j], &arrStrings[0], &arrStrings[1], 100)) {
+        int pos = ch_message[j].out % PACKETS_COUNT;
 
-    if (pstrEvents[i % PACKETS_COUNT] != arrStrings[0] && pstrMessages[i % PACKETS_COUNT] == arrStrings[1]) {
-      std::cerr << "pstrEvents != arrStrings, " << pstrEvents[i % PACKETS_COUNT] << " != " << arrStrings[0] << std::endl;
-      return 1;
+        ASSERT_EQ(arrStrings[0], pstrEvents[pos]);
+        ASSERT_EQ(arrStrings[1], pstrMessages[pos]);
+
+        arrStrings[0].clear();
+        arrStrings[1].clear();
+
+        ch_message[j].out++;
+        ASSERT_GE(ch_message[j].in, ch_message[j].out);
+      }
     }
 
-    if (pstrEvents[(i + 1) % PACKETS_COUNT] != arrStrings[2] && pstrMessages[(i + 1) % PACKETS_COUNT] == arrStrings[3]) {
-      std::cerr << "pstrEvents != arrStrings, " << pstrEvents[i % PACKETS_COUNT] << " != " << arrStrings[0] << std::endl;
-      return 1;
+    // check objects
+    std::shared_ptr<MF_BASE_TYPE> arrBufferOut;
+
+    for (int j = 0; j < channel_count; j++) {
+      while (S_OK == MFPipe_Read.PipeGet(test_channels[j], arrBufferOut, 100, "")) {
+        int pos = ch_object[j].out % PACKETS_COUNT;
+        ASSERT_EQ(arrBufferOut, arrBuffersIn[pos]);
+        arrBufferOut.reset();
+        ch_object[j].out++;
+        ASSERT_GE(ch_object[j].in, ch_object[j].out);
+      }
     }
 
-    //        MFPipe_Write.PipeMessageGet("ch2", NULL, &arrStrings[2], 100);
-    //
-    //
-    //
-    std::shared_ptr<MF_BASE_TYPE> arrBuffersOut[8];
-    MFPipe_Read.PipeGet("ch1", arrBuffersOut[0], 100, "");
-    MFPipe_Read.PipeGet("ch2", arrBuffersOut[1], 100, "");
-
-    MFPipe_Read.PipeGet("ch1", arrBuffersOut[4], 100, "");
-    MFPipe_Read.PipeGet("ch2", arrBuffersOut[5], 100, "");
-    MFPipe_Read.PipeGet("ch2", arrBuffersOut[6], 100, "");
-
-    if (!arrBuffersOut[0] || arrBuffersOut[0]->serialize() != arrBuffersIn[i % PACKETS_COUNT]->serialize()) {
-      return 1;
-    }
-
-    // TODO: Your test code here
+    ASSERT_EQ(MFPipe_Read.PipeGet("ch2", arrBufferOut, 100, ""), S_FALSE);
   }
 
-  return 0;
-}
-
-int
-main(void)
-{
-  if (TestMethod1()) {
-    std::cerr << "TestMethod1: Failed" << std::endl;
-    return 1;
+  for (int j = 0; j < channel_count; j++) {
+    ASSERT_EQ(ch_object[j].in, ch_object[j].out);
+    ASSERT_EQ(ch_message[j].in, ch_message[j].out);
   }
-
-  return 0;
 }

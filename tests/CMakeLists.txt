@@ -13,8 +13,8 @@ add_executable(
 target_link_libraries(
         mfpipe_test
         MFPipe
+        gtest_main
 )
-
 
 project(mfpipe_gtest)
 

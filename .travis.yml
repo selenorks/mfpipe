@@ -16,7 +16,6 @@ jobs:
       before_install:
         - echo $LANG
         - echo $LC_ALL
-        - scripts/dependencies.sh
       script:
         - bash scripts/build.sh
       after_success:
@@ -25,16 +24,4 @@ jobs:
       env:
         global:
           - LANG="en_US.UTF-8"
-
-#    - name: Windows
-#      os: windows
-#      language: shell
-#      before_install:
-#        - choco install cmake ninja
-#        - scripts/dependencies.bat
-#      script:
-#        - scripts/build.sh
-#      after_success:
-#        - cd build
-#        - ctest
 

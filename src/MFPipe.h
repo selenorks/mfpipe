@@ -1,5 +1,5 @@
-#ifndef MF_PIPE_
-#define MF_PIPE_
+#ifndef UUID_FAF822DC_D1C9_41EA_ADBE_7D69AD418AE0
+#define UUID_FAF822DC_D1C9_41EA_ADBE_7D69AD418AE0
 
 #include <memory>
 #include <string>

@@ -7,12 +7,14 @@ find_package(Threads REQUIRED)
 
 file(GLOB
         SOURCES
+        internal/*.cpp
+        internal/*.h
+        internal/protocols/*.h
+        internal/protocols/*.h
+        internal/protocols/*.cpp
         *.cpp
         *.h
-        internal/*.h
-        internal/*.cpp
 )
-
 
 add_library(
         ${PROJECT_NAME}
@@ -20,17 +22,15 @@ add_library(
         ${SOURCES}
 )
 
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
+endif(WIN32)
 
 target_include_directories(
         ${PROJECT_NAME}
-        PRIVATE
+        PUBLIC
         .
-)
-
-target_include_directories(
-        ${PROJECT_NAME}
-        INTERFACE
-        .
+        internal/protocols/${SYSTEM_PREFIX}
 )
 
 target_link_libraries(

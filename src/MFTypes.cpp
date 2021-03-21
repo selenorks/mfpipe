@@ -1,11 +1,11 @@
 #include "MFTypes.h"
 #include "internal/serialization.h"
+#include <chrono>
 #include <iostream>
-
 std::unique_ptr<MF_BASE_TYPE>
-MF_BASE_TYPE::deserialize(const void* data)
+MF_BASE_TYPE::deserialize(const std::string_view& data)
 {
-  auto type = *reinterpret_cast<const MF_OBJECT_TYPE*>(data);
+  auto type = *reinterpret_cast<const MF_OBJECT_TYPE*>(data.data());
   switch (type) {
     case MF_OBJECT_FRAME:
       return MF_FRAME::deserialize(data);
@@ -39,10 +39,10 @@ MF_FRAME::serialize() const
 }
 
 std::unique_ptr<MF_FRAME>
-MF_FRAME::deserialize(const void* data)
+MF_FRAME::deserialize(const std::string_view& data)
 {
   std::unique_ptr<MF_FRAME> object = std::make_unique<MF_FRAME>();
-  const char* ptr = reinterpret_cast<const char*>(data);
+  const char* ptr = reinterpret_cast<const char*>(data.data());
 
   ptr += sizeof(MF_OBJECT_TYPE);
 
@@ -74,16 +74,18 @@ MF_BUFFER::serialize() const
 }
 
 std::unique_ptr<MF_BUFFER>
-MF_BUFFER::deserialize(const void* data)
+MF_BUFFER::deserialize(const std::string_view& data)
 {
+
   std::unique_ptr<MF_BUFFER> object = std::make_unique<MF_BUFFER>();
-  const char* ptr = reinterpret_cast<const char*>(data);
+  const char* ptr = reinterpret_cast<const char*>(data.data());
 
   ptr += sizeof(MF_OBJECT_TYPE);
 
   object->flags = *reinterpret_cast<const eMFBufferFlags*>(ptr);
   ptr += sizeof(eMFBufferFlags);
 
+  auto start = std::chrono::steady_clock::now();
   object->data = parseVector(ptr);
 
   return object;
@@ -100,4 +102,10 @@ bool
 operator==(const MF_BUFFER& a, const MF_BUFFER& b)
 {
   return a.flags == b.flags && a.data == b.data;
+}
+
+bool
+operator==(const std::shared_ptr<MF_BASE_TYPE>& a, const std::shared_ptr<MF_BUFFER>& b)
+{
+  return a && b && a->serialize() == b->serialize();
 }

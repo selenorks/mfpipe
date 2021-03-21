@@ -1,13 +1,18 @@
-#ifndef MF_TYPES_H_
-#define MF_TYPES_H_
+#ifndef UUID_3B5A0D9B_9C86_448D_94BA_EEE6F42E7ACE
+#define UUID_3B5A0D9B_9C86_448D_94BA_EEE6F42E7ACE
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
+#include "internal/serialization.h"
+#ifdef WIN32
+#include <winerror.h>
+#endif
 
 typedef long long int REFERENCE_TIME;
 
+#ifndef WIN32
 typedef enum HRESULT
 {
   S_OK = 0,
@@ -16,7 +21,7 @@ typedef enum HRESULT
   E_OUTOFMEMORY = 0x8007000EL,
   E_INVALIDARG = 0x80070057L
 } HRESULT;
-
+#endif
 typedef struct M_TIME
 {
   REFERENCE_TIME rtStartTime;
@@ -78,13 +83,11 @@ typedef struct MF_BASE_TYPE
 {
   virtual ~MF_BASE_TYPE() {}
   virtual std::vector<uint8_t> serialize() const = 0;
-  static std::unique_ptr<MF_BASE_TYPE> deserialize(const void* data);
+  static std::unique_ptr<MF_BASE_TYPE> deserialize(const std::string_view& data);
 } MF_BASE_TYPE;
 
 typedef struct MF_FRAME : public MF_BASE_TYPE
 {
-  typedef std::shared_ptr<MF_FRAME> TPtr;
-
   M_TIME time = {};
   M_AV_PROPS av_props = {};
   std::string str_user_props;
@@ -93,7 +96,7 @@ typedef struct MF_FRAME : public MF_BASE_TYPE
 
   MF_OBJECT_TYPE type() const { return MF_OBJECT_FRAME; }
   std::vector<uint8_t> serialize() const override;
-  static std::unique_ptr<MF_FRAME> deserialize(const void* data);
+  static std::unique_ptr<MF_FRAME> deserialize(const std::string_view& data);
 
 } MF_FRAME;
 
@@ -111,18 +114,58 @@ typedef enum eMFBufferFlags
 
 typedef struct MF_BUFFER : public MF_BASE_TYPE
 {
-  typedef std::shared_ptr<MF_BUFFER> TPtr;
-
   eMFBufferFlags flags;
   std::vector<uint8_t> data;
 
   MF_OBJECT_TYPE type() const { return MF_OBJECT_BUFFER; }
 
   std::vector<uint8_t> serialize() const override;
-  static std::unique_ptr<MF_BUFFER> deserialize(const void* data);
+  static std::unique_ptr<MF_BUFFER> deserialize(const std::string_view& data);
 } MF_BUFFER;
 
-bool operator ==(const MF_FRAME &a, const MF_FRAME& b);
-bool operator ==(const MF_BUFFER &a, const MF_BUFFER& b);
+bool
+operator==(const MF_FRAME& a, const MF_FRAME& b);
+bool
+operator==(const MF_BUFFER& a, const MF_BUFFER& b);
 
+bool
+operator==(const std::shared_ptr<MF_BASE_TYPE>& a, const std::shared_ptr<MF_BUFFER>& b);
+
+struct Message : public MF_BASE_TYPE
+{
+  Message(const std::string& strEventName, const std::string& strEventParam)
+      : strEventName(strEventName)
+      , strEventParam(strEventParam)
+  {}
+  Message() = default;
+  Message(const Message&) = default;
+  Message(Message&&) = default;
+
+  std::vector<uint8_t> serialize() const
+  {
+    std::vector<uint8_t> data;
+    int size = sizeof(size_t) + strEventName.size() + sizeof(size_t) + strEventParam.size();
+    data.resize(size);
+
+    uint8_t* ptr = data.data();
+
+    copyData(ptr, strEventName.data(), strEventName.size());
+    copyData(ptr, strEventParam.data(), strEventParam.size());
+
+    return data;
+  }
+
+  static std::unique_ptr<Message> deserialize(const std::string_view& data)
+  {
+    auto message = std::make_unique<Message>();
+
+    const char* ptr = data.data();
+    message->strEventName = parseString(ptr);
+    message->strEventParam = parseString(ptr);
+    return message;
+  }
+
+  std::string strEventName;
+  std::string strEventParam;
+};
 #endif

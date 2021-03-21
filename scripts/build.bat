@@ -1,4 +1,4 @@
 mkdir build
 cd build
-cmake .. -GNinja
-ninja
+cmake ..
+cmake --build .
