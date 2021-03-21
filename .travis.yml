@@ -20,7 +20,7 @@ jobs:
         - bash scripts/build.sh
       after_success:
         - cd build
-        - ctest
+        - ctest -VV
       env:
         global:
           - LANG="en_US.UTF-8"
