@@ -90,7 +90,7 @@ protected:
   std::unique_ptr<IPipe> m_pipe;
   std::unique_ptr<std::thread> m_thread;
 
-  bool m_is_connected{ false };
+  std::atomic<bool> m_is_connected{ false };
   std::condition_variable_any m_connect_event;
 
   std::timed_mutex write_mutex;

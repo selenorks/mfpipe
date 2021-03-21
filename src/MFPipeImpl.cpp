@@ -228,8 +228,8 @@ MFPipeImpl::Init()
 
   if (MF_PIPE_MODE::PIPE_READER == m_pipe_mode) {
     if (SendHandshake()) {
-      std::unique_lock lock(write_mutex);
       m_is_connected = true;
+      m_connect_event.notify_one();
       return true;
     }
     return false;
@@ -259,11 +259,11 @@ void
 MFPipeImpl::Parse(Accumulator& parser)
 {
   switch (parser.type()) {
-    case PacketType::PacketHandShakes: {
-      std::unique_lock lock(write_mutex);
+    case PacketType::PacketHandShakes:
       m_is_connected = true;
+      m_connect_event.notify_one();
       break;
-    }
+
     case PacketType::PacketMessage: {
       const std::string& channel = parser.channel();
       int object_count = m_current_count_objects++;
@@ -387,6 +387,12 @@ MFPipeImpl::PipeOpen(/*[in]*/ const std::string& strPipeID, /*[in]*/ int _nMaxBu
 
 HRESULT MFPipeImpl::WriteToPipe(const void* data, size_t size, int _nMaxWaitMs)
 {
+
+  while (!m_is_connected)
+  {
+    std::this_thread::yield();
+  }
+
   std::unique_lock<std::timed_mutex> lock(write_mutex, std::defer_lock);
   if (_nMaxWaitMs > 0) {
     auto timeout = std::chrono::steady_clock::now() + std::chrono::milliseconds(_nMaxWaitMs);
@@ -397,7 +403,7 @@ HRESULT MFPipeImpl::WriteToPipe(const void* data, size_t size, int _nMaxWaitMs)
   }
 
   // in case for first message
-  if (!m_connect_event.wait_for(lock, std::chrono::milliseconds(_nMaxWaitMs), [&] { return m_is_connected; }))
+  if (!m_connect_event.wait_for(lock, std::chrono::milliseconds(_nMaxWaitMs), [&] { return m_is_connected.load(); }))
     return S_FALSE;
 
   if (m_pipe->write(data, size) < 0)

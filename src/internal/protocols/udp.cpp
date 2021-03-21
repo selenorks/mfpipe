@@ -150,6 +150,7 @@ UDPPipeClient::write(const void* data, uint32_t len)
 size_t
 UDPPipeClient::read(void* buffer, uint32_t buffer_len)
 {
+  socklen_t len = sizeof(m_dst_address);
 #ifdef WIN32
   fd_set fds{};
   struct timeval tv{};
@@ -159,8 +160,6 @@ UDPPipeClient::read(void* buffer, uint32_t buffer_len)
   auto r = select ( m_socket, &fds, NULL, NULL, &tv );
   if(r==0)
     return 0;
-
-  socklen_t len = sizeof(m_dst_address);
 
   auto n = recvfrom(m_socket, (char*)buffer, buffer_len, 0, (struct sockaddr*)&m_dst_address, &len);
 #else
